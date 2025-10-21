@@ -1,9 +1,36 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Heart } from "lucide-react";
+import { Heart, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
 
 const Navbar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [user, setUser] = useState<any>(null);
+  
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast({
+      title: "Logged out",
+      description: "You've been successfully logged out.",
+    });
+    navigate("/");
+  };
   
   const isActive = (path: string) => location.pathname === path;
   
@@ -59,9 +86,21 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <Link to="/contact">
-            <Button size="sm">Contact Us</Button>
-          </Link>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <span className="hidden text-sm text-muted-foreground md:inline">
+                {user.email}
+              </span>
+              <Button size="sm" variant="outline" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
+          ) : (
+            <Link to="/auth">
+              <Button size="sm">Sign In</Button>
+            </Link>
+          )}
         </div>
       </div>
     </nav>

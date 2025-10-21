@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,12 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { Users } from "lucide-react";
 
 const Recipient = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     age: "",
@@ -23,18 +26,73 @@ const Recipient = () => {
     urgencyLevel: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // TODO: Submit to database once Lovable Cloud is enabled
-    toast({
-      title: "Request Submitted!",
-      description: "We're searching for compatible donors. You'll be notified soon.",
-    });
-    
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1500);
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to submit a request.",
+        variant: "destructive",
+      });
+      navigate("/auth");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from("recipients").insert([
+        {
+          user_id: user.id,
+          name: formData.name,
+          age: parseInt(formData.age),
+          required_type: formData.requiredType,
+          blood_group: formData.requiredType === "blood" ? formData.bloodGroup : null,
+          organ_type: formData.requiredType === "organ" ? formData.organType : null,
+          contact: formData.contact,
+          hospital_id: formData.hospitalId,
+          urgency_level: formData.urgencyLevel,
+        },
+      ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Request Submitted!",
+        description: "We're searching for compatible donors. You'll be notified soon.",
+      });
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1500);
+    } catch (error: any) {
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Unable to submit request. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -189,8 +247,8 @@ const Recipient = () => {
                 </div>
 
                 <div className="flex gap-4">
-                  <Button type="submit" className="flex-1" size="lg">
-                    Submit Request
+                  <Button type="submit" className="flex-1" size="lg" disabled={loading}>
+                    {loading ? "Submitting..." : "Submit Request"}
                   </Button>
                   <Button
                     type="button"

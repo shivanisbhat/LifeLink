@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,12 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { Heart } from "lucide-react";
 
 const Donor = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     age: "",
@@ -22,18 +25,73 @@ const Donor = () => {
     city: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // TODO: Submit to database once Lovable Cloud is enabled
-    toast({
-      title: "Registration Successful!",
-      description: "Thank you for registering as a donor. You're a hero! 🎉",
-    });
-    
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1500);
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to register as a donor.",
+        variant: "destructive",
+      });
+      navigate("/auth");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from("donors").insert([
+        {
+          user_id: user.id,
+          name: formData.name,
+          age: parseInt(formData.age),
+          gender: formData.gender,
+          blood_group: formData.bloodGroup,
+          organ_type: formData.organType || null,
+          contact: formData.contact,
+          city: formData.city,
+          availability: true,
+        },
+      ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Registration Successful!",
+        description: "Thank you for registering as a donor. You're a hero! 🎉",
+      });
+
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1500);
+    } catch (error: any) {
+      toast({
+        title: "Registration Failed",
+        description: error.message || "Unable to register. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -171,8 +229,8 @@ const Donor = () => {
                 </div>
 
                 <div className="flex gap-4">
-                  <Button type="submit" className="flex-1" size="lg">
-                    Register as Donor
+                  <Button type="submit" className="flex-1" size="lg" disabled={loading}>
+                    {loading ? "Registering..." : "Register as Donor"}
                   </Button>
                   <Button
                     type="button"

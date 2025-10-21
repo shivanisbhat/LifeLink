@@ -1,24 +1,63 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Heart, Users, Activity, Clock } from "lucide-react";
 
 const Dashboard = () => {
-  // Mock data - will be replaced with real data from Lovable Cloud
-  const mockDonors = [
-    { id: 1, name: "John Doe", bloodGroup: "A+", city: "New York", availability: "Available" },
-    { id: 2, name: "Sarah Smith", bloodGroup: "O-", city: "Los Angeles", availability: "Available" },
-    { id: 3, name: "Mike Johnson", bloodGroup: "B+", city: "Chicago", availability: "Not Available" },
-  ];
+  const navigate = useNavigate();
+  const [donors, setDonors] = useState<any[]>([]);
+  const [recipients, setRecipients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const mockRecipients = [
-    { id: 1, name: "Jane Wilson", required: "A+ Blood", urgency: "High", hospital: "City General" },
-    { id: 2, name: "Robert Brown", required: "Kidney", urgency: "Critical", hospital: "Memorial Hospital" },
-    { id: 3, name: "Emily Davis", required: "O+ Blood", urgency: "Medium", hospital: "Central Medical" },
-  ];
+  useEffect(() => {
+    const checkAuthAndFetch = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+      fetchData();
+    };
+
+    checkAuthAndFetch();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const fetchData = async () => {
+    try {
+      const [donorsResponse, recipientsResponse] = await Promise.all([
+        supabase.from("donors").select("*").order("created_at", { ascending: false }).limit(5),
+        supabase
+          .from("recipients")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
+
+      if (donorsResponse.error) throw donorsResponse.error;
+      if (recipientsResponse.error) throw recipientsResponse.error;
+
+      setDonors(donorsResponse.data || []);
+      setRecipients(recipientsResponse.data || []);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getUrgencyColor = (urgency: string) => {
-    switch (urgency.toLowerCase()) {
+    switch (urgency?.toLowerCase()) {
       case "critical":
         return "destructive";
       case "high":
@@ -29,6 +68,17 @@ const Dashboard = () => {
         return "secondary";
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container mx-auto px-4 py-12">
+          <div className="text-center">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,24 +148,26 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockDonors.map((donor) => (
-                  <div
-                    key={donor.id}
-                    className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
-                  >
-                    <div>
-                      <p className="font-medium text-foreground">{donor.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {donor.bloodGroup} • {donor.city}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={donor.availability === "Available" ? "default" : "secondary"}
+                {donors.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground">No donors registered yet</p>
+                ) : (
+                  donors.map((donor) => (
+                    <div
+                      key={donor.id}
+                      className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
                     >
-                      {donor.availability}
-                    </Badge>
-                  </div>
-                ))}
+                      <div>
+                        <p className="font-medium text-foreground">{donor.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {donor.blood_group} • {donor.city}
+                        </p>
+                      </div>
+                      <Badge variant={donor.availability ? "default" : "secondary"}>
+                        {donor.availability ? "Available" : "Not Available"}
+                      </Badge>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -128,22 +180,29 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockRecipients.map((recipient) => (
-                  <div
-                    key={recipient.id}
-                    className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
-                  >
-                    <div>
-                      <p className="font-medium text-foreground">{recipient.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {recipient.required} • {recipient.hospital}
-                      </p>
+                {recipients.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground">No recipients registered yet</p>
+                ) : (
+                  recipients.map((recipient) => (
+                    <div
+                      key={recipient.id}
+                      className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
+                    >
+                      <div>
+                        <p className="font-medium text-foreground">{recipient.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {recipient.required_type === "blood"
+                            ? `${recipient.blood_group} Blood`
+                            : `${recipient.organ_type} Organ`}{" "}
+                          • {recipient.hospital_id}
+                        </p>
+                      </div>
+                      <Badge variant={getUrgencyColor(recipient.urgency_level)}>
+                        {recipient.urgency_level}
+                      </Badge>
                     </div>
-                    <Badge variant={getUrgencyColor(recipient.urgency)}>
-                      {recipient.urgency}
-                    </Badge>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

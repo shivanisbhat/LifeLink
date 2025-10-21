@@ -14,7 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      donors: {
+        Row: {
+          age: number
+          availability: boolean
+          blood_group: string
+          city: string
+          contact: string
+          created_at: string
+          gender: string
+          id: string
+          name: string
+          organ_type: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          age: number
+          availability?: boolean
+          blood_group: string
+          city: string
+          contact: string
+          created_at?: string
+          gender: string
+          id?: string
+          name: string
+          organ_type?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          age?: number
+          availability?: boolean
+          blood_group?: string
+          city?: string
+          contact?: string
+          created_at?: string
+          gender?: string
+          id?: string
+          name?: string
+          organ_type?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      hospitals: {
+        Row: {
+          contact: string
+          created_at: string
+          hospital_id: string
+          id: string
+          location: string
+          name: string
+        }
+        Insert: {
+          contact: string
+          created_at?: string
+          hospital_id: string
+          id?: string
+          location: string
+          name: string
+        }
+        Update: {
+          contact?: string
+          created_at?: string
+          hospital_id?: string
+          id?: string
+          location?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      recipients: {
+        Row: {
+          age: number
+          blood_group: string | null
+          contact: string
+          created_at: string
+          hospital_id: string
+          id: string
+          name: string
+          organ_type: string | null
+          required_type: string
+          status: string
+          updated_at: string
+          urgency_level: string
+          user_id: string | null
+        }
+        Insert: {
+          age: number
+          blood_group?: string | null
+          contact: string
+          created_at?: string
+          hospital_id: string
+          id?: string
+          name: string
+          organ_type?: string | null
+          required_type: string
+          status?: string
+          updated_at?: string
+          urgency_level: string
+          user_id?: string | null
+        }
+        Update: {
+          age?: number
+          blood_group?: string | null
+          contact?: string
+          created_at?: string
+          hospital_id?: string
+          id?: string
+          name?: string
+          organ_type?: string | null
+          required_type?: string
+          status?: string
+          updated_at?: string
+          urgency_level?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          created_at: string
+          donor_id: string | null
+          id: string
+          notes: string | null
+          recipient_id: string | null
+          status: string
+          transaction_date: string
+        }
+        Insert: {
+          created_at?: string
+          donor_id?: string | null
+          id?: string
+          notes?: string | null
+          recipient_id?: string | null
+          status?: string
+          transaction_date?: string
+        }
+        Update: {
+          created_at?: string
+          donor_id?: string | null
+          id?: string
+          notes?: string | null
+          recipient_id?: string | null
+          status?: string
+          transaction_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_donor_id_fkey"
+            columns: ["donor_id"]
+            isOneToOne: false
+            referencedRelation: "donors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
