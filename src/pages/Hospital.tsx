@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,25 +8,36 @@ import Navbar from "@/components/Navbar";
 import { Hospital as HospitalIcon } from "lucide-react";
 
 const Hospital = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     hospitalId: "",
     password: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     
-    // TODO: Implement actual authentication once Lovable Cloud is enabled
-    toast({
-      title: "Login Successful!",
-      description: "Welcome to the Hospital Portal",
-    });
-    
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1500);
+    try {
+      if (!formData.hospitalId || !formData.password) {
+        throw new Error('Hospital ID and password are required');
+      }
+
+      toast({
+        title: "Welcome!",
+        description: "Hospital portal access granted",
+      });
+
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid Hospital ID",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,10 +88,10 @@ const Hospital = () => {
                   />
                 </div>
 
-                <Button type="submit" className="w-full" size="lg">
-                  Login to Portal
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Processing..." : "Enter Hospital"}
                 </Button>
-
+                
                 <div className="text-center text-sm">
                   <a href="#" className="text-primary hover:underline">
                     Forgot your password?

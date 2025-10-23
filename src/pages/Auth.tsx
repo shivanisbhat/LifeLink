@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({ email: "", password: "", confirmPassword: "" });
 
@@ -21,36 +22,49 @@ const Auth = () => {
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        startTransition(() => {
+          navigate("/");
+        });
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate("/");
+        startTransition(() => {
+          navigate("/");
+        });
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, startTransition]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // Debug: log env values so we can confirm client is configured
+      console.log('SUPABASE_URL=', import.meta.env.VITE_SUPABASE_URL);
+      console.log('SUPABASE_PUBLISHABLE_KEY=', import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+
+      const res = await supabase.auth.signInWithPassword({
         email: loginData.email,
         password: loginData.password,
       });
 
-      if (error) throw error;
+      // Debug: log the full response object
+      // eslint-disable-next-line no-console
+      console.log('supabase signIn response:', res);
+
+      if (res.error) throw res.error;
 
       toast({
         title: "Welcome back!",
         description: "You've successfully logged in.",
       });
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error;
       toast({
         title: "Login Failed",
         description: error.message || "Invalid email or password.",
@@ -85,7 +99,11 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // Debug: log env values so we can confirm client is configured
+      console.log('SUPABASE_URL=', import.meta.env.VITE_SUPABASE_URL);
+      console.log('SUPABASE_PUBLISHABLE_KEY=', import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+
+      const res = await supabase.auth.signUp({
         email: signupData.email,
         password: signupData.password,
         options: {
@@ -93,13 +111,26 @@ const Auth = () => {
         },
       });
 
-      if (error) throw error;
+      console.log('supabase signUp response:', res);
 
-      toast({
-        title: "Account created!",
-        description: "Welcome to LifeLink. You're now logged in.",
-      });
-    } catch (error: any) {
+      if (res.error) throw res.error;
+
+      // If a session is returned, the user is signed in immediately.
+      // Otherwise, Supabase requires email confirmation — inform the user.
+      if (res.data?.session) {
+        toast({
+          title: "Account created!",
+          description: "Welcome to LifeLink. You're now logged in.",
+        });
+      } else {
+        toast({
+          title: "Account created — confirm your email",
+          description:
+            "We've sent a confirmation link to your email. Please check your inbox and confirm to complete sign up.",
+        });
+      }
+    } catch (err) {
+      const error = err as Error;
       toast({
         title: "Signup Failed",
         description: error.message || "Unable to create account.",
